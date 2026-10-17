@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tripwire</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1b1b18; --muted: #6b6a63; --line: #e3e1d9;
+    --accent: #3b5bdb; --green: #2b8a3e; --yellow: #c08a00; --red: #c92a2a; --code: #f1f0ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141412; --panel: #1d1d1a; --ink: #ecebe5; --muted: #9a998f; --line: #2e2d29;
+            --accent: #7c95ff; --green: #51cf66; --yellow: #fcc419; --red: #ff6b6b; --code: #252521; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 48px 16px 80px; }
+  h1 { font-size: 40px; margin: 0; letter-spacing: -0.02em; }
+  .tag { color: var(--muted); margin: 6px 0 28px; font-size: 18px; }
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input { flex: 1 1 360px; padding: 14px 16px; font-size: 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button { padding: 14px 22px; font-size: 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .hint { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  .hint a { color: var(--accent); cursor: pointer; }
+  .how { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 32px 0; }
+  .how div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; color: var(--muted); }
+  .how b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 2px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-top: 20px; }
+  section h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
+  .steps { list-style: none; padding: 0; margin: 0; }
+  .steps li { padding: 6px 0; border-bottom: 1px dashed var(--line); display: flex; gap: 12px; }
+  .steps li:last-child { border: 0; }
+  .t { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 52px; font-size: 14px; padding-top: 1px; }
+  .ok { color: var(--green); } .bad { color: var(--red); }
+  pre { background: var(--code); border-radius: 10px; padding: 12px 14px; overflow: auto; font-size: 13px; max-height: 320px; margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 14px; margin-top: 10px; }
+  .verdict { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
+  .green { color: var(--green); } .yellow { color: var(--yellow); } .red { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+  td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; }
+  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--code); color: var(--muted); }
+  .hidden { display: none; }
+  .meta { color: var(--muted); font-size: 14px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>⚡ Tripwire</h1>
+  <p class="tag">Got a take-home test from a recruiter, or found a repo you want to try? Let Tripwire run it first — in a locked-down cloud sandbox — and tell you if it does anything it shouldn't.</p>
+
+  <form id="f">
+    <input id="src" placeholder="https://github.com/owner/repo" autocomplete="off" required>
+    <button id="go">Test-run it</button>
+  </form>
+  <div class="hint">Try the sample take-home test: <a id="demo">use the demo repo</a></div>
+
+  <div class="how" id="how">
+    <div><b>1 · Isolated</b>Runs in a fresh CreateOS sandbox, never on your laptop.</div>
+    <div><b>2 · Locked network</b>Only the npm registry is allowed. Every other connection is blocked and logged.</div>
+    <div><b>3 · Watched</b>Records every file opened and server contacted during install, start and test.</div>
+    <div><b>4 · Self-coding</b>The AI writes its own analyzer, tests it, and fixes it until it passes.</div>
+  </div>
+
+  <section id="live" class="hidden"><h2>Live</h2><ul class="steps" id="steps"></ul><div id="code"></div></section>
+  <section id="rep" class="hidden"></section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+$("demo").onclick = () => { $("src").value = "demo"; $("f").requestSubmit(); };
+
+$("f").onsubmit = async (ev) => {
+  ev.preventDefault();
+  $("go").disabled = true; $("steps").innerHTML = ""; $("code").innerHTML = "";
+  $("rep").classList.add("hidden"); $("live").classList.remove("hidden"); $("how").classList.add("hidden");
+  const r = await fetch("/api/scan", { method: "POST", body: JSON.stringify({ source: $("src").value }) });
+  const j = await r.json();
+  if (!r.ok) { addStep("", j.error, false); $("go").disabled = false; return; }
+  const es = new EventSource(`/api/scan/${j.id}/events`);
+  es.onmessage = (m) => handle(JSON.parse(m.data), es);
+};
+
+function addStep(t, msg, ok) {
+  const li = document.createElement("li");
+  li.innerHTML = `<span class="t">${t === "" ? "" : t.toFixed(1) + "s"}</span><span class="${ok === true ? "ok" : ok === false ? "bad" : ""}">${esc(msg)}</span>`;
+  $("steps").append(li);
+}
+
+function handle(e, es) {
+  if (e.type === "step") addStep(e.t, e.msg, e.ok);
+  else if (e.type === "code") $("code").insertAdjacentHTML("beforeend", `<details><summary>AI-written analyzer — attempt ${e.attempt} (${esc(e.model)})</summary><pre>${esc(e.code)}</pre></details>`);
+  else if (e.type === "output") $("code").insertAdjacentHTML("beforeend", `<details><summary>Output of npm ${esc(e.lane)}</summary><pre>${esc(e.text)}</pre></details>`);
+  else if (e.type === "error") addStep("", "Error: " + e.msg, false);
+  else if (e.type === "report") showReport(e.report);
+  else if (e.type === "done") { es.close(); $("go").disabled = false; }
+}
+
+function showReport(r) {
+  const label = { green: "🟢 Looks clean", yellow: "🟡 Worth a look", red: "🔴 Behaves unexpectedly" }[r.verdict];
+  const files = r.files.map((f) => `<tr><td><code>${esc(f.path)}</code>${f.marker ? ' <span class="pill">Tripwire test file</span>' : ""}</td><td><code>${esc(f.command)}</code></td><td>npm ${esc(f.lane)}</td></tr>`).join("");
+  const conns = r.connections.map((c) => `<tr><td><code>${esc(c.ip)}:${c.port}</code> <span class="pill">blocked</span></td><td><code>${esc(c.command)}</code></td><td>npm ${esc(c.lane)}</td></tr>`).join("");
+  $("rep").innerHTML = `
+    <h2>Report · ${esc(r.project)}</h2>
+    <p class="verdict ${r.verdict}">${label}</p>
+    <p>${esc(r.summary)}</p>
+    ${files ? `<h2 style="margin-top:20px">Files opened outside the project</h2><table><tr><th>File</th><th>Opened by</th><th>During</th></tr>${files}</table>` : ""}
+    ${conns ? `<h2 style="margin-top:20px">Outside connections attempted</h2><table><tr><th>Address</th><th>Attempted by</th><th>During</th></tr>${conns}</table>` : ""}
+    ${!files && !conns ? `<p class="ok">No unexpected file access. No outside connections.</p>` : ""}
+    <p class="meta">Ran ${r.lanes.map((l) => `npm ${esc(l.lane)} (exit ${l.exitCode})`).join(", ")} in ${r.seconds}s ·
+      analyzer written by ${r.analyzer.author === "ai" ? `the AI, passed on attempt ${r.analyzer.attempts}` : "Tripwire (built-in fallback)"}
+      ${r.keptForEvidence.length ? ` · evidence snapshot: ${r.keptForEvidence.map(esc).join(", ")}` : ""}</p>`;
+  $("rep").classList.remove("hidden");
+}
+</script>
+</body>
+</html>

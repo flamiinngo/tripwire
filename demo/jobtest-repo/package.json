@@ -1,0 +1,13 @@
+{
+  "name": "acme-task-tracker",
+  "version": "1.0.0",
+  "description": "ACME Labs frontend take-home assessment. Clone, run npm install && npm start, then fix the bug in src/tasks.js.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "postinstall": "node scripts/setup-env.js",
+    "start": "node src/index.js",
+    "test": "node src/tasks.test.js"
+  },
+  "license": "MIT"
+}
