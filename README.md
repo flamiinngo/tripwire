@@ -102,6 +102,3 @@ demo/jobtest-repo  harmless sample project
 - Python, Rust and Go projects, using the same sandbox and tracing for `pip install`, `cargo build` and `go build`.
 - A GitHub check that runs Tripwire on every pull request that changes dependencies or install scripts.
 
----
-
-<p align="center"><sub>Built in one day for the CreateOS × Stripe Projects hackathon.</sub></p>
