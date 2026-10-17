@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Tripwire works</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff; --soft: #f7f7f8; --ink: #0b0b0f; --body: #3f3f46; --muted: #71717a; --faint: #a1a1aa; --hair: #ececef;
+    --accent: #4f46e5; --accent-soft: #eef0ff; --green: #059669; --amber: #c2780a; --red: #dc2626;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body { margin: 0; color: var(--ink); font: 16px/1.6 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { background: radial-gradient(1100px 520px at 50% -180px, #eef0ff 0%, rgba(238,240,255,0) 70%) no-repeat, var(--bg); }
+  a { color: inherit; }
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .narrow { max-width: 720px; margin: 0 auto; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; letter-spacing: -.01em; text-decoration: none; }
+  .logo { width: 26px; height: 26px; display: block; }
+  .links { display: flex; gap: 28px; font-size: 14px; color: var(--muted); }
+  .links a { text-decoration: none; transition: color .15s; } .links a:hover, .links a.on { color: var(--ink); }
+
+  header { text-align: center; padding: 88px 0 56px; }
+  .kicker { font: 500 12.5px var(--mono); color: var(--accent); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 20px; }
+  h1 { font-size: clamp(40px, 6vw, 64px); line-height: 1.04; letter-spacing: -.045em; font-weight: 700; margin: 0 auto 22px; max-width: 820px; }
+  .lede { font-size: 19px; color: var(--body); max-width: 620px; margin: 0 auto; }
+
+  .diagram { margin: 24px auto 120px; max-width: 1000px; }
+  .diagram svg { width: 100%; height: auto; display: block; }
+  .diagram text { font-family: Inter, sans-serif; }
+  .diagram .lbl { font-size: 14px; font-weight: 600; fill: var(--ink); }
+  .diagram .sub { font-size: 11.5px; fill: var(--muted); font-family: "JetBrains Mono", monospace; }
+  .diagram .cap { font-size: 11px; fill: var(--faint); font-family: "JetBrains Mono", monospace; letter-spacing: .04em; }
+
+  section.stage { display: grid; grid-template-columns: 200px 1fr; gap: 48px; padding: 56px 0; border-top: 1px solid var(--hair); }
+  section.stage > div { min-width: 0; }
+  body { overflow-x: hidden; }
+  .stage .num { font: 500 13px var(--mono); color: var(--faint); }
+  .stage .num b { display: block; font: 600 15px Inter, sans-serif; color: var(--ink); margin-top: 6px; letter-spacing: -.01em; }
+  .stage h2 { font-size: 28px; letter-spacing: -.03em; line-height: 1.15; margin: 0 0 14px; font-weight: 700; }
+  .stage p { color: var(--body); font-size: 17px; line-height: 1.7; margin: 0 0 14px; max-width: 640px; }
+  pre { margin: 22px 0 0; padding: 18px 20px; border-radius: 12px; background: #0d0d12; color: #d4d4dc; font: 13px/1.7 var(--mono); overflow: auto; max-width: 640px; }
+  .c { color: #6b6b78; } .k { color: #c4b5fd; } .s { color: #86efac; } .f { color: #93c5fd; }
+  .loop { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; font: 500 13px var(--mono); }
+  .loop span { padding: 7px 12px; border-radius: 99px; background: var(--soft); color: var(--body); }
+  .loop i { font-style: normal; color: var(--faint); align-self: center; }
+
+  .verdicts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 26px; }
+  .verdicts h3 { font-size: 20px; letter-spacing: -.02em; margin: 0 0 8px; }
+  .verdicts p { font-size: 15px; color: var(--muted); margin: 0; }
+  .g { color: var(--green); } .a { color: var(--amber); } .r { color: var(--red); }
+
+  .cta { text-align: center; padding: 96px 0 120px; border-top: 1px solid var(--hair); }
+  .cta h2 { font-size: clamp(32px, 4.5vw, 44px); letter-spacing: -.04em; margin: 0 0 28px; }
+  .btn { display: inline-flex; align-items: center; height: 52px; padding: 0 28px; border-radius: 99px; background: var(--ink); color: #fff; font-weight: 600; text-decoration: none; transition: transform .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  footer { border-top: 1px solid var(--hair); padding: 32px 0 48px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+  footer a { text-decoration: none; } footer a:hover { color: var(--ink); }
+
+  @media (max-width: 760px) {
+    section.stage { grid-template-columns: 1fr; gap: 14px; padding: 44px 0; }
+    .verdicts { grid-template-columns: 1fr; gap: 24px; } .links { gap: 18px; font-size: 13.5px; } .lede { font-size: 17px; } header { padding: 56px 0 40px; }
+    .diagram { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <nav>
+    <a class="brand" href="/"><img class="logo" src="/logo.svg" alt="">Tripwire</a>
+    <div class="links"><a href="/how" class="on">How it works</a><a href="https://github.com/flamiinngo/tripwire" target="_blank" rel="noopener">GitHub</a></div>
+  </nav>
+
+  <header>
+    <div class="kicker">How it works</div>
+    <h1>A second machine for code you don't trust yet.</h1>
+    <p class="lede">From the moment you paste a link to the verdict, here is everything Tripwire does, and which CreateOS capability makes each step possible.</p>
+  </header>
+
+  <div class="diagram" aria-label="Tripwire pipeline diagram">
+    <svg viewBox="0 0 1000 300" fill="none">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#c4c4cc"/></marker>
+      </defs>
+      <!-- sandbox boundary -->
+      <rect x="150" y="18" width="700" height="264" rx="20" fill="#fafafb" stroke="#e4e4e8" stroke-dasharray="5 5"/>
+      <text x="172" y="44" class="cap">CREATEOS SANDBOX · EGRESS: registry.npmjs.org ONLY</text>
+
+      <!-- input -->
+      <rect x="10" y="122" width="116" height="56" rx="12" fill="#fff" stroke="#e4e4e8"/>
+      <text x="68" y="146" text-anchor="middle" class="lbl">Repo link</text>
+      <text x="68" y="164" text-anchor="middle" class="sub">github.com/…</text>
+      <path d="M126 150h44" stroke="#c4c4cc" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <!-- agent writes analyzer -->
+      <rect x="176" y="70" width="150" height="64" rx="12" fill="#fff" stroke="#e4e4e8"/>
+      <text x="251" y="97" text-anchor="middle" class="lbl">Agent writes</text>
+      <text x="251" y="116" text-anchor="middle" class="sub">its own analyzer</text>
+      <text x="251" y="62" text-anchor="middle" class="cap" style="fill:#6366f1">↻ write · run · fix</text>
+
+      <!-- install -->
+      <rect x="176" y="166" width="150" height="64" rx="12" fill="#fff" stroke="#e4e4e8"/>
+      <text x="251" y="193" text-anchor="middle" class="lbl">npm install</text>
+      <text x="251" y="212" text-anchor="middle" class="sub">traced by strace</text>
+      <path d="M251 134v28" stroke="#c4c4cc" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <!-- snapshot -->
+      <path d="M326 198h56" stroke="#c4c4cc" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="388" y="166" width="132" height="64" rx="12" fill="#fff" stroke="#e4e4e8"/>
+      <text x="454" y="193" text-anchor="middle" class="lbl">Snapshot</text>
+      <text x="454" y="212" text-anchor="middle" class="sub">pause()</text>
+
+      <!-- forks -->
+      <path d="M520 190c40 0 40-70 80-70" stroke="#c4c4cc" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+      <path d="M520 206c40 0 40 50 80 50" stroke="#c4c4cc" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+      <rect x="606" y="90" width="124" height="58" rx="12" fill="#fff" stroke="#e4e4e8"/>
+      <text x="668" y="115" text-anchor="middle" class="lbl">npm start</text>
+      <text x="668" y="133" text-anchor="middle" class="sub">fork()</text>
+      <rect x="606" y="226" width="124" height="44" rx="12" fill="#fff" stroke="#e4e4e8"/>
+      <text x="668" y="253" text-anchor="middle" class="lbl">npm test <tspan class="sub" dx="6">fork()</tspan></text>
+
+      <!-- blocked attempt -->
+      <path d="M730 119h56" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <path d="M786 112l12 14M798 112l-12 14" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+      <text x="760" y="104" text-anchor="middle" class="cap" style="fill:#dc2626">blocked</text>
+
+      <!-- verdict -->
+      <path d="M850 150h20" stroke="#c4c4cc" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="876" y="116" width="114" height="68" rx="12" fill="#0b0b0f"/>
+      <text x="933" y="145" text-anchor="middle" class="lbl" style="fill:#fff">Verdict</text>
+      <text x="933" y="164" text-anchor="middle" class="sub" style="fill:#a1a1aa">+ evidence</text>
+    </svg>
+  </div>
+
+  <div class="narrow">
+    <section class="stage">
+      <div class="num">01<b>Isolate</b></div>
+      <div>
+        <h2>Every repo gets its own machine.</h2>
+        <p>Tripwire creates a fresh CreateOS sandbox for each scan and clones the repository into it. Nothing from the project ever runs on your computer, and the sandbox is destroyed when the scan ends.</p>
+        <pre><span class="k">const</span> sb = <span class="k">await</span> client.<span class="f">createSandbox</span>({ rootfs: <span class="s">"devbox:1"</span>, shape: <span class="s">"s-1vcpu-1gb"</span> });</pre>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="num">02<b>Lock the network</b></div>
+      <div>
+        <h2>Only the package registry gets through.</h2>
+        <p>Once the code is inside, the sandbox's egress allowlist is narrowed to the npm registry. Installing dependencies still works. Anything else the project tries to reach is refused at the network level, and Tripwire records the attempt.</p>
+        <pre><span class="k">await</span> sb.<span class="f">setEgress</span>([<span class="s">"registry.npmjs.org:443"</span>]);</pre>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="num">03<b>Write its own tools</b></div>
+      <div>
+        <h2>The agent builds the analyzer it needs, and proves it works.</h2>
+        <p>Raw traces are messy: many processes interleave, and lines are split mid-call. Rather than ship a fixed parser, the agent asks the model to write one, runs it inside the sandbox against a calibration trace with known activity, and checks the result.</p>
+        <p>If the parser misses something, the agent sends back the error together with the exact log lines it misread, and the model fixes its own code. Only a parser that passes is trusted with the real scan.</p>
+        <div class="loop"><span>write</span><i>→</i><span>run in sandbox</span><i>→</i><span>check against known trace</span><i>→</i><span>fix</span></div>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="num">04<b>Trace</b></div>
+      <div>
+        <h2>Watch everything the install does.</h2>
+        <p>A test file is planted in the home folder, a place no normal project needs to look. Then <code>npm install</code> runs under <code>strace</code>, which records every file opened and every connection attempted, along with the exact command responsible.</p>
+        <pre><span class="c"># every openat, connect and execve, across every child process</span>
+strace -f -e trace=openat,connect,execve npm install</pre>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="num">05<b>Fork</b></div>
+      <div>
+        <h2>One install, many runs in parallel.</h2>
+        <p>The installed sandbox is paused and forked. Each fork starts from the identical state and runs a different entry point, so <code>npm start</code> and <code>npm test</code> are checked side by side without reinstalling. A fork that misbehaves is paused, preserving its exact state as evidence.</p>
+        <pre><span class="k">await</span> sb.<span class="f">pause</span>();
+<span class="k">const</span> fork = <span class="k">await</span> sb.<span class="f">fork</span>({ egress: [<span class="s">"registry.npmjs.org:443"</span>] });</pre>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="num">06<b>Report</b></div>
+      <div>
+        <h2>A clear answer, with the evidence.</h2>
+        <p>Every file outside the project and every blocked connection is matched to the command that caused it. You get a verdict, a plain-English explanation, and the details to check for yourself.</p>
+        <div class="verdicts">
+          <div><h3 class="g">Looks clean</h3><p>Only touched its own folder and normal system files. No outside connections.</p></div>
+          <div><h3 class="a">Worth a closer look</h3><p>Opened files outside its folder, or failed to install.</p></div>
+          <div><h3 class="r">Behaves unexpectedly</h3><p>Opened files in the home folder, or tried to reach a server it doesn't need.</p></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="cta">
+    <h2>Got a repo you're unsure about?</h2>
+    <a class="btn" href="/">Test-run it now</a>
+  </section>
+
+  <footer><span>Tripwire · sandboxes by CreateOS · stack provisioned with Stripe Projects</span><a href="https://github.com/flamiinngo/tripwire" target="_blank" rel="noopener">Source on GitHub</a></footer>
+</div>
+</body>
+</html>

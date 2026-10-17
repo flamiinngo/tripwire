@@ -28,9 +28,11 @@ function startScan(source) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (req.method === "GET" && url.pathname === "/") {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    return res.end(await readFile(new URL("../public/index.html", import.meta.url)));
+  const pages = { "/": ["index.html", "text/html; charset=utf-8"], "/how": ["how.html", "text/html; charset=utf-8"], "/logo.svg": ["logo.svg", "image/svg+xml"] };
+  if (req.method === "GET" && pages[url.pathname]) {
+    const [file, type] = pages[url.pathname];
+    res.writeHead(200, { "Content-Type": type });
+    return res.end(await readFile(new URL(`../public/${file}`, import.meta.url)));
   }
   if (req.method === "POST" && url.pathname === "/api/scan") {
     let body = "";

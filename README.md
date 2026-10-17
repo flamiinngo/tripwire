@@ -1,82 +1,107 @@
-# ⚡ Tripwire
+<p align="center">
+  <img src="public/logo.svg" width="64" height="64" alt="Tripwire logo">
+</p>
 
-**Test-run an unfamiliar repo in a locked-down cloud sandbox before it ever touches your laptop.**
+<h1 align="center">Tripwire</h1>
 
-Built for the CreateOS × Stripe "Build Agents That Run Code" hackathon.
+<p align="center">
+  Run unfamiliar code somewhere safe first.<br>
+  Tripwire installs a repo in an isolated, network-locked sandbox and tells you exactly what it touched.
+</p>
 
-## The problem
+---
+
+## Why
 
 Developers run strangers' code all the time: a take-home test from a recruiter, an open-source project
-you want to build on, a starter template from a tutorial. `npm install` runs that code's install scripts
-**on your machine, with your files and your network**, before you've read a line of it.
+you want to build on, a starter template from a tutorial. `npm install` executes that project's install
+scripts on your machine, with your files and your network, before you've read a line of it.
 
-Most of the time it's fine. When it isn't, you find out too late.
+Usually that's fine. When it isn't, you find out too late. Fake take-home assignments that run harmful
+code at install time are a well-documented way of targeting developers.
 
-## What Tripwire does
+Tripwire gives you a second machine to try it on first.
 
-Paste a repo link. Tripwire:
+## How it works
 
-1. **Creates a fresh CreateOS sandbox** — an isolated cloud machine, not your laptop.
-2. **Locks the network** with the sandbox's egress allowlist: only `registry.npmjs.org` is reachable.
-   Any other connection is blocked — and recorded.
-3. **Places a test marker file** in the sandbox's home folder. A normal project has no reason to open it.
-4. **Runs `npm install` under `strace`**, recording every file opened and every connection attempted.
-5. **Snapshots the sandbox and forks it** to run `npm start` and `npm test` in parallel, each watched the same way.
-   If a fork behaves unexpectedly, Tripwire **pauses it** so its exact state is kept as evidence.
-6. **Writes its own analyzer.** The AI writes a Python script to parse the trace, the agent runs it in the
-   sandbox against a calibration trace with known activity, and if it fails, the error goes back to the AI
-   to fix — until it passes. (A built-in analyzer is the fallback.)
-7. **Reports back** in plain English:
+Paste a repository link. Tripwire:
+
+1. **Creates a fresh CreateOS sandbox.** Every repo gets its own isolated machine.
+2. **Locks the network.** The sandbox's egress allowlist permits only `registry.npmjs.org`. Every other
+   connection is blocked, and the attempt is recorded.
+3. **Plants a test file** in the sandbox's home folder. A normal project has no reason to open it.
+4. **Writes its own analyzer.** The agent asks the model to write a Python parser for the trace, runs it
+   in the sandbox against a calibration trace with known activity, and if the output is wrong, sends
+   the error and the relevant log lines back to be fixed. It retries until the parser passes, and falls
+   back to a built-in parser if it can't.
+5. **Traces the install.** `npm install` runs under `strace`, recording every file opened and every
+   connection attempted.
+6. **Forks in parallel.** The installed sandbox is paused and forked, so `npm start` and `npm test` run
+   side by side from the same state. A fork that behaves unexpectedly is paused to preserve the evidence.
+7. **Reports back** with a verdict, a plain-English explanation, and the evidence: which file or address,
+   which command was responsible, and during which step.
 
 | Verdict | Meaning |
 |---|---|
-| 🟢 Looks clean | Only touched its own folder and normal system files. No outside connections. |
-| 🟡 Worth a look | Opened files outside its folder, or failed to install. |
-| 🔴 Behaves unexpectedly | Opened files in your home folder, or tried to contact a server it doesn't need. |
+| **Looks clean** | Touched only its own folder and normal system files. No outside connections. |
+| **Worth a closer look** | Opened files outside its folder, or failed to install. |
+| **Behaves unexpectedly** | Opened files in the home folder, or tried to reach a server it doesn't need. |
 
-…with the evidence: which file, which server, which command did it, and during which step.
+## Built with
 
-## Sponsor tools
-
-| Tool | How Tripwire uses it |
+| | |
 |---|---|
-| **CreateOS Sandbox** | Isolated run (`createSandbox`), network allowlist as the core control (`setEgress`), `pause` + `fork` to try entry points in parallel from the same installed state, pausing a fork to keep evidence, `files.upload`, `runCommand`. |
-| **Stripe Projects** | Provisioned every service (CreateOS, OpenRouter) and manages all keys, including the Gemini key — `stripe projects env --pull` writes `.env`. No keys in code. |
-| **Gemini + OpenRouter** (keys in Stripe Projects) | The LLM that writes and fixes the trace analyzer, and explains the result in plain English. Gemini first; OpenRouter free models as fallback. |
+| **CreateOS Sandbox** | Isolation (`createSandbox`), network control as the core mechanism (`setEgress`), `pause` and `fork` to run entry points in parallel from one installed state, pausing a fork to keep evidence. |
+| **Stripe Projects** | Provisions every service and manages every key. `stripe projects env --pull` writes `.env`; nothing secret lives in the code. |
+| **Gemini, with OpenRouter as fallback** | Writes and repairs the trace analyzer, and explains the result. Both keys are managed through Stripe Projects. |
 
-## Run it
+## Run it locally
 
 ```bash
 npm install
-stripe projects env --pull          # writes .env with the CreateOS, OpenRouter and Gemini keys
-npm start                           # open http://localhost:3000
-# or from the terminal:
+stripe projects env --pull     # writes .env with the CreateOS, Gemini and OpenRouter keys
+npm start                      # open http://localhost:3000
+```
+
+From the terminal:
+
+```bash
 npm run scan -- https://github.com/owner/repo
-npm run scan                        # scans the bundled demo repo
+npm run scan                   # scans the bundled sample
 ```
 
-If a run is interrupted, `npm run cleanup` destroys any leftover sandboxes.
+Sandboxes are billed while they run. Tripwire destroys them when a scan ends and when the server is
+stopped with Ctrl+C. If a run is ever interrupted, `npm run cleanup` removes anything left behind.
 
-## The demo repo
+## The sample repo
 
-`demo/jobtest-repo` plays a "take-home test from a recruiter". It is **harmless on purpose**: its install
-step opens only the test marker file Tripwire creates, and tries to reach `192.0.2.10` — a
-documentation-only address (RFC 5737) that nothing answers, and the sandbox blocks anyway. It exists so
-the demo has something to catch.
+`demo/jobtest-repo` plays the part of a take-home test. It is harmless by design: its install step opens
+only the test file Tripwire plants, and tries to reach `192.0.2.10`, an address reserved for
+documentation (RFC 5737) that nothing answers and the sandbox blocks regardless. It exists so the demo
+has something to find.
 
-## Layout
+## Project layout
 
 ```
-src/agent.mjs     the agent: sandbox, network lock, tracing, fork lanes, self-fixing analyzer, report
-src/analyzer.mjs  built-in fallback analyzer
-src/llm.mjs       OpenRouter client with free-model fallback
-src/server.mjs    web UI server (live progress over Server-Sent Events)
-src/cli.mjs       terminal runner
-public/index.html web UI
-demo/jobtest-repo harmless demo fixture
+src/agent.mjs      the agent: sandbox, network lock, tracing, forks, self-repairing analyzer, report
+src/analyzer.mjs   built-in fallback analyzer
+src/llm.mjs        model client (Gemini first, OpenRouter fallback)
+src/server.mjs     web server, streams progress over Server-Sent Events
+src/cli.mjs        terminal runner
+public/            web interface, How it works page, and logo
+demo/jobtest-repo  harmless sample project
 ```
 
-## Limits (honest)
+## Tested on
 
-- Node/npm projects today; the same approach works for `pip install`, `cargo build`, etc.
-- A project could behave differently when it detects a sandbox. Tripwire raises confidence; it isn't a guarantee.
+- **The sample take-home test** — flagged as *Behaves unexpectedly*: it opened the planted file and tried to reach a blocked address, both traced to `scripts/setup-env.js`.
+- **[lukeed/kleur](https://github.com/lukeed/kleur)**, a widely used open-source package — *Looks clean* in 37 seconds, with no false alarms.
+
+## What's next
+
+- Python, Rust and Go projects, using the same sandbox and tracing for `pip install`, `cargo build` and `go build`.
+- A GitHub check that runs Tripwire on every pull request that changes dependencies or install scripts.
+
+---
+
+<p align="center"><sub>Built in one day for the CreateOS × Stripe Projects hackathon.</sub></p>
