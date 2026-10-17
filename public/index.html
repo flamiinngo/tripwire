@@ -209,6 +209,7 @@ function advance(id, t) {
     if (i === idx && !el.classList.contains("done") && !el.classList.contains("warn")) el.classList.add("active");
   });
   if (t != null && !step(id).dataset.t) { step(id).dataset.t = t; step(id).querySelector(".t").textContent = t.toFixed(1) + "s"; }
+  if (AUTO && idx > 0) step(id).scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function reset() {
@@ -337,7 +338,15 @@ function showReport(r) {
     <div class="again"><a onclick="window.scrollTo({top:0,behavior:'smooth'});document.getElementById('src').select()">Test another repo</a></div>`;
   $("report").className = "on";
   setTimeout(() => $("report").scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+  if (AUTO) {
+    setTimeout(() => window.scrollBy({ top: 420, behavior: "smooth" }), 9000);
+    setTimeout(() => (location.href = "/how?tour=1"), 17000);
+  }
 }
+
+// Demo mode (?autorun=1): runs the sample scan hands-free, then tours the How it works page.
+const AUTO = new URLSearchParams(location.search).has("autorun");
+if (AUTO) setTimeout(() => $("demo").click(), 3500);
 
 $("demo").onclick = () => { $("src").value = "demo"; $("f").requestSubmit(); };
 $("f").onsubmit = async (ev) => {
