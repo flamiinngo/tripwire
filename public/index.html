@@ -3,118 +3,354 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tripwire</title>
+<title>Tripwire — run unfamiliar code somewhere safe first</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B0B0F'/%3E%3Cpath d='M8.5 10v12M23.5 10v12' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M8.5 16h15' stroke='%23fff' stroke-opacity='.5' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='%23818CF8' stroke='%230B0B0F' stroke-width='1.6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6f5f1; --panel: #ffffff; --ink: #1b1b18; --muted: #6b6a63; --line: #e3e1d9;
-    --accent: #3b5bdb; --green: #2b8a3e; --yellow: #c08a00; --red: #c92a2a; --code: #f1f0ea;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #141412; --panel: #1d1d1a; --ink: #ecebe5; --muted: #9a998f; --line: #2e2d29;
-            --accent: #7c95ff; --green: #51cf66; --yellow: #fcc419; --red: #ff6b6b; --code: #252521; }
+    --bg: #ffffff; --soft: #f7f7f8; --ink: #0b0b0f; --body: #3f3f46; --muted: #71717a; --faint: #a1a1aa; --hair: #ececef;
+    --accent: #4f46e5; --green: #059669; --amber: #c2780a; --red: #dc2626;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 880px; margin: 0 auto; padding: 48px 16px 80px; }
-  h1 { font-size: 40px; margin: 0; letter-spacing: -0.02em; }
-  .tag { color: var(--muted); margin: 6px 0 28px; font-size: 18px; }
-  form { display: flex; gap: 8px; flex-wrap: wrap; }
-  input { flex: 1 1 360px; padding: 14px 16px; font-size: 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
-  button { padding: 14px 22px; font-size: 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
-  button:disabled { opacity: .5; cursor: default; }
-  .hint { color: var(--muted); font-size: 14px; margin-top: 8px; }
-  .hint a { color: var(--accent); cursor: pointer; }
-  .how { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 32px 0; }
-  .how div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; font-size: 14px; color: var(--muted); }
-  .how b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 2px; }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-top: 20px; }
-  section h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
-  .steps { list-style: none; padding: 0; margin: 0; }
-  .steps li { padding: 6px 0; border-bottom: 1px dashed var(--line); display: flex; gap: 12px; }
-  .steps li:last-child { border: 0; }
-  .t { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 52px; font-size: 14px; padding-top: 1px; }
-  .ok { color: var(--green); } .bad { color: var(--red); }
-  pre { background: var(--code); border-radius: 10px; padding: 12px 14px; overflow: auto; font-size: 13px; max-height: 320px; margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; }
-  details summary { cursor: pointer; color: var(--accent); font-size: 14px; margin-top: 10px; }
-  .verdict { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
-  .green { color: var(--green); } .yellow { color: var(--yellow); } .red { color: var(--red); }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
-  td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 500; }
-  code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; }
-  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--code); color: var(--muted); }
-  .hidden { display: none; }
-  .meta { color: var(--muted); font-size: 14px; margin-top: 14px; }
+  html { scroll-behavior: smooth; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { background: radial-gradient(1100px 520px at 50% -180px, #eef0ff 0%, rgba(238,240,255,0) 70%) no-repeat, var(--bg); }
+  a { color: inherit; }
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .narrow { max-width: 720px; margin: 0 auto; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; letter-spacing: -.01em; text-decoration: none; }
+  .logo { width: 26px; height: 26px; display: block; }
+  .links { display: flex; gap: 28px; font-size: 14px; color: var(--muted); }
+  .links a { text-decoration: none; transition: color .15s; } .links a:hover { color: var(--ink); }
+
+  /* hero */
+  .hero { text-align: center; padding: 88px 0 72px; transition: padding .35s ease; }
+  .badge { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--body); padding: 5px 12px 5px 6px; border-radius: 99px; background: rgba(255,255,255,.8); box-shadow: 0 0 0 1px var(--hair); margin-bottom: 28px; }
+  .badge b { font-weight: 600; font-size: 11px; color: #fff; background: var(--accent); padding: 2px 8px; border-radius: 99px; }
+  h1 { font-size: clamp(42px, 6.4vw, 72px); line-height: 1.02; letter-spacing: -.045em; font-weight: 700; margin: 0 0 24px; }
+  h1 span { color: var(--faint); }
+  .lede { font-size: 19px; line-height: 1.6; color: var(--body); max-width: 600px; margin: 0 auto 40px; }
+
+  form { position: relative; max-width: 600px; margin: 0 auto; }
+  input { width: 100%; height: 60px; border: 0; border-radius: 99px; padding: 0 160px 0 26px; font: 15px var(--mono); color: var(--ink); background: #fff; outline: 0;
+    box-shadow: 0 0 0 1px var(--hair), 0 1px 2px rgba(16,16,24,.04), 0 12px 32px -12px rgba(16,16,24,.14); transition: box-shadow .2s; }
+  input:focus { box-shadow: 0 0 0 1px #c7c9f5, 0 0 0 5px rgba(79,70,229,.10), 0 12px 32px -12px rgba(16,16,24,.14); }
+  input::placeholder { color: var(--faint); }
+  button { position: absolute; right: 7px; top: 7px; height: 46px; padding: 0 24px; border: 0; border-radius: 99px; background: var(--ink); color: #fff; font: 600 15px Inter, sans-serif; cursor: pointer; transition: transform .15s, opacity .15s; }
+  button:hover { transform: translateY(-1px); } button:disabled { opacity: .4; transform: none; cursor: default; }
+  .sample { margin-top: 18px; font-size: 14px; color: var(--muted); }
+  .sample a { color: var(--ink); font-weight: 500; cursor: pointer; text-decoration: none; border-bottom: 1px solid #d4d4d8; padding-bottom: 1px; transition: border-color .15s; }
+  .sample a:hover { border-color: var(--ink); }
+
+  /* how it works */
+  .how { display: grid; grid-template-columns: repeat(4, 1fr); gap: 48px; padding: 24px 0 120px; }
+  .how .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 500 12px var(--mono); color: var(--ink); box-shadow: 0 0 0 1px var(--hair); margin-bottom: 20px; }
+  .how h3 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 8px; }
+  .how p { font-size: 15px; color: var(--muted); margin: 0; }
+  .how .api { display: block; margin-top: 12px; font: 12.5px var(--mono); color: var(--faint); }
+
+  /* running */
+  body.running .hero { padding: 24px 0 40px; }
+  body.running .hero .badge, body.running .hero h1, body.running .hero .lede, body.running .sample, body.running .how { display: none; }
+  #run { display: none; padding-bottom: 120px; }
+  body.running #run { display: block; }
+  .runhead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 40px; }
+  .runhead h2 { font-size: 28px; letter-spacing: -.03em; font-weight: 700; margin: 0; }
+  .runhead .clock { font: 14px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  ol.timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+  .step { position: relative; padding: 0 0 36px 44px; opacity: .38; transition: opacity .4s; }
+  .step::before { content: ""; position: absolute; left: 9px; top: 26px; bottom: 2px; width: 1px; background: var(--hair); }
+  .step:last-child::before { display: none; }
+  .step .pt { position: absolute; left: 0; top: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1.5px #d4d4d8; transition: all .3s; }
+  .step.active, .step.done, .step.warn { opacity: 1; }
+  .step.active .pt { box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .step.active .pt::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--ink); animation: pulse 1.2s ease-in-out infinite; }
+  .step.done .pt { background: var(--green); box-shadow: none; }
+  .step.done .pt::after { content: ""; position: absolute; left: 6px; top: 4px; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .step.warn .pt { background: var(--red); box-shadow: none; }
+  .step.warn .pt::after { content: "!"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font: 700 12px Inter; }
+  @keyframes pulse { 50% { transform: scale(.55); opacity: .5; } }
+  .step .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .step h4 { font-size: 17px; font-weight: 600; letter-spacing: -.015em; margin: 0; }
+  .step .t { font: 13px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+  .step .d { color: var(--body); font-size: 15px; margin-top: 6px; }
+  .step .d:empty { display: none; }
+  .mono { font-family: var(--mono); font-size: 13.5px; }
+  .kv { display: grid; grid-template-columns: 76px 1fr auto; gap: 4px 12px; margin-top: 10px; font: 13.5px var(--mono); }
+  .kv .k { font-size: 11px; font-weight: 500; letter-spacing: .06em; padding-top: 2px; }
+  .kv .k.g { color: var(--green); } .kv .k.x { color: var(--faint); } .kv .k.r { color: var(--red); }
+  .kv .v.r { color: var(--red); } .kv .w { color: var(--faint); font-size: 12.5px; text-align: right; }
+  .attempt { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 15px; }
+  .attempt .s { font-size: 13px; font-weight: 500; } .attempt .s.ok { color: var(--green); } .attempt .s.bad { color: var(--red); } .attempt .s.wait { color: var(--muted); }
+  .attempt .why { color: var(--muted); font-size: 14px; }
+  .toggle { font-size: 13.5px; color: var(--accent); cursor: pointer; font-weight: 500; user-select: none; margin-left: auto; white-space: nowrap; }
+  pre.code { margin: 14px 0 0; padding: 18px 20px; border-radius: 12px; background: #0d0d12; color: #d4d4dc; font: 12.5px/1.7 var(--mono); max-height: 360px; overflow: auto; display: none; }
+  pre.code.open { display: block; }
+  .kw { color: #c4b5fd; } .str { color: #86efac; } .cm { color: #6b6b78; } .fn { color: #93c5fd; }
+  .lane { display: grid; grid-template-columns: 110px 1fr auto; gap: 12px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 15px; }
+  .lane:first-of-type { margin-top: 6px; } .lane:last-child { border-bottom: 0; }
+  .lane .nm { font: 500 14px var(--mono); }
+  .lane .id { font: 12.5px var(--mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .tag.run { color: var(--muted); } .tag.run::before { animation: pulse 1s infinite; }
+  .tag.ok { color: var(--green); } .tag.flag { color: var(--red); } .tag.exit { color: var(--amber); }
+
+  details.raw { margin-top: 8px; }
+  details.raw summary { font-size: 13.5px; color: var(--muted); cursor: pointer; list-style: none; }
+  details.raw summary::before { content: "+ "; } details.raw[open] summary::before { content: "− "; }
+  .log { margin-top: 12px; font: 12.5px/1.75 var(--mono); color: var(--body); max-height: 280px; overflow: auto; padding: 16px 18px; background: var(--soft); border-radius: 12px; }
+  .log div { display: flex; gap: 14px; } .log .lt { color: var(--faint); min-width: 44px; text-align: right; flex: none; }
+
+  /* report */
+  #report { display: none; margin-top: 24px; padding-top: 56px; border-top: 1px solid var(--hair); }
+  #report.on { display: block; animation: rise .5s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  .eyebrow { font: 500 12.5px var(--mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .verdict { font-size: clamp(36px, 5vw, 52px); line-height: 1.05; letter-spacing: -.04em; font-weight: 700; margin: 14px 0 22px; }
+  .verdict.red { color: var(--red); } .verdict.yellow { color: var(--amber); } .verdict.green { color: var(--green); }
+  .summary { font-size: 18px; line-height: 1.7; color: var(--body); margin: 0 0 44px; }
+  .summary code { font: 15px var(--mono); color: var(--ink); background: var(--soft); padding: 2px 6px; border-radius: 5px; }
+  .figures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 52px; }
+  .fig .n { font-size: 36px; font-weight: 700; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fig .l { font-size: 14px; color: var(--muted); margin-top: 8px; }
+  h5 { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .02em; margin: 0 0 6px; }
+  .ev { list-style: none; margin: 0; padding: 0; }
+  .ev li { padding: 18px 0; border-bottom: 1px solid var(--hair); }
+  .ev .what { font: 500 15px var(--mono); word-break: break-all; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ev .what small { font: 500 12px Inter, sans-serif; color: var(--red); }
+  .ev .what small.p { color: var(--accent); }
+  .ev .how2 { font-size: 14.5px; color: var(--muted); margin-top: 4px; }
+  .ev .how2 code { font: 13.5px var(--mono); color: var(--body); }
+  .again { margin-top: 40px; font-size: 15px; }
+  .again a { font-weight: 500; cursor: pointer; text-decoration: none; border-bottom: 1px solid #d4d4d8; }
+
+  footer { border-top: 1px solid var(--hair); padding: 32px 0 48px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+  footer a { text-decoration: none; } footer a:hover { color: var(--ink); }
+
+  @media (max-width: 860px) { .how { grid-template-columns: 1fr 1fr; gap: 40px; } .figures { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) {
+    .how { grid-template-columns: 1fr; } .links { display: none; } .hero { padding-top: 48px; }
+    input { padding-right: 26px; } button { position: static; width: 100%; margin-top: 10px; height: 52px; }
+    .lane { grid-template-columns: 1fr auto; } .lane .id { display: none; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>⚡ Tripwire</h1>
-  <p class="tag">Got a take-home test from a recruiter, or found a repo you want to try? Let Tripwire run it first — in a locked-down cloud sandbox — and tell you if it does anything it shouldn't.</p>
+<div class="container">
+  <nav>
+    <a class="brand" href="/"><svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0B0B0F"/><path d="M8.5 10v12M23.5 10v12" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M8.5 16h15" stroke="#fff" stroke-opacity=".5" stroke-width="1.6" stroke-linecap="round"/><circle cx="16" cy="16" r="3.4" fill="#818CF8" stroke="#0B0B0F" stroke-width="1.6"/></svg>Tripwire</a>
+    <div class="links"><a href="#how" id="howlink">How it works</a><a href="https://github.com/flamiinngo/tripwire" target="_blank" rel="noopener">GitHub</a></div>
+  </nav>
 
-  <form id="f">
-    <input id="src" placeholder="https://github.com/owner/repo" autocomplete="off" required>
-    <button id="go">Test-run it</button>
-  </form>
-  <div class="hint">Try the sample take-home test: <a id="demo">use the demo repo</a></div>
+  <section class="hero">
+    <div class="badge"><b>New</b>Built on CreateOS sandboxes</div>
+    <h1>Run it here first.<br><span>Not on your laptop.</span></h1>
+    <p class="lede">A recruiter's take-home test. A repo you found on GitHub. Tripwire installs and runs it in an isolated sandbox with the network locked down, then tells you exactly what it touched.</p>
+    <form id="f">
+      <input id="src" placeholder="github.com/owner/repo" autocomplete="off" spellcheck="false" required>
+      <button id="go">Test-run</button>
+    </form>
+    <div class="sample">No repo handy? <a id="demo">Try a sample take-home test</a></div>
+  </section>
 
-  <div class="how" id="how">
-    <div><b>1 · Isolated</b>Runs in a fresh CreateOS sandbox, never on your laptop.</div>
-    <div><b>2 · Locked network</b>Only the npm registry is allowed. Every other connection is blocked and logged.</div>
-    <div><b>3 · Watched</b>Records every file opened and server contacted during install, start and test.</div>
-    <div><b>4 · Self-coding</b>The AI writes its own analyzer, tests it, and fixes it until it passes.</div>
-  </div>
+  <section class="how" id="how">
+    <div><div class="n">1</div><h3>Isolated</h3><p>Every repo gets its own fresh sandbox. Nothing ever runs on your machine.</p><span class="api">createSandbox</span></div>
+    <div><div class="n">2</div><h3>Network locked</h3><p>Only the npm registry is reachable. Anything else is blocked, and recorded.</p><span class="api">setEgress</span></div>
+    <div><div class="n">3</div><h3>Forked in parallel</h3><p>After install, the sandbox is snapshotted and forked to run start and test side by side.</p><span class="api">pause · fork</span></div>
+    <div><div class="n">4</div><h3>Writes its own tools</h3><p>The agent writes the analyzer it needs, tests it on a known trace, and fixes it until it passes.</p><span class="api">write · run · fix</span></div>
+  </section>
 
-  <section id="live" class="hidden"><h2>Live</h2><ul class="steps" id="steps"></ul><div id="code"></div></section>
-  <section id="rep" class="hidden"></section>
-</main>
+  <section id="run" class="narrow">
+    <div class="runhead"><h2 id="runtitle">Test-running…</h2><span class="clock" id="clock">0.0s</span></div>
+    <ol class="timeline">
+      <li class="step" id="s-sandbox"><span class="pt"></span><div class="row"><h4>Create an isolated sandbox</h4><span class="t"></span></div><div class="d"></div></li>
+      <li class="step" id="s-lock"><span class="pt"></span><div class="row"><h4>Lock the network</h4><span class="t"></span></div><div class="d"></div></li>
+      <li class="step" id="s-ai"><span class="pt"></span><div class="row"><h4>Write and test its own analyzer</h4><span class="t"></span></div><div class="d"></div></li>
+      <li class="step" id="s-install"><span class="pt"></span><div class="row"><h4>Install, with every file and connection traced</h4><span class="t"></span></div><div class="d"></div></li>
+      <li class="step" id="s-forks"><span class="pt"></span><div class="row"><h4>Fork and run start and test in parallel</h4><span class="t"></span></div><div class="d"></div></li>
+      <li class="step" id="s-verdict"><span class="pt"></span><div class="row"><h4>Verdict</h4><span class="t"></span></div><div class="d"></div></li>
+    </ol>
+    <details class="raw"><summary>Raw agent log</summary><div class="log" id="log"></div></details>
+    <div id="report"></div>
+  </section>
+
+  <footer><span>Tripwire · sandboxes by CreateOS · stack provisioned with Stripe Projects</span><a href="https://github.com/flamiinngo/tripwire" target="_blank" rel="noopener">Source on GitHub</a></footer>
+</div>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-$("demo").onclick = () => { $("src").value = "demo"; $("f").requestSubmit(); };
+const ORDER = ["sandbox", "lock", "ai", "install", "forks", "verdict"];
+const MATCH = [
+  ["sandbox", /Creating an isolated|is running$/],
+  ["lock", /Uploading|Cloning|Network locked|Project "/],
+  ["ai", /calibration|Asking the AI|Analyzer failed|AI unavailable|built-in analyzer/],
+  ["install", /Running npm install|Install finished/],
+  ["forks", /Snapshotting|^Fork|Skipped|Sandbox limit|running npm/],
+];
+let S, timer;
 
-$("f").onsubmit = async (ev) => {
-  ev.preventDefault();
-  $("go").disabled = true; $("steps").innerHTML = ""; $("code").innerHTML = "";
-  $("rep").classList.add("hidden"); $("live").classList.remove("hidden"); $("how").classList.add("hidden");
-  const r = await fetch("/api/scan", { method: "POST", body: JSON.stringify({ source: $("src").value }) });
-  const j = await r.json();
-  if (!r.ok) { addStep("", j.error, false); $("go").disabled = false; return; }
-  const es = new EventSource(`/api/scan/${j.id}/events`);
-  es.onmessage = (m) => handle(JSON.parse(m.data), es);
-};
+const step = (id) => $("s-" + id);
+const detail = (id) => step(id).querySelector(".d");
+function advance(id, t) {
+  const idx = ORDER.indexOf(id);
+  ORDER.forEach((k, i) => {
+    const el = step(k);
+    if (i < idx && !el.classList.contains("warn")) { el.classList.remove("active"); el.classList.add("done"); }
+    if (i === idx && !el.classList.contains("done") && !el.classList.contains("warn")) el.classList.add("active");
+  });
+  if (t != null && !step(id).dataset.t) { step(id).dataset.t = t; step(id).querySelector(".t").textContent = t.toFixed(1) + "s"; }
+}
 
-function addStep(t, msg, ok) {
-  const li = document.createElement("li");
-  li.innerHTML = `<span class="t">${t === "" ? "" : t.toFixed(1) + "s"}</span><span class="${ok === true ? "ok" : ok === false ? "bad" : ""}">${esc(msg)}</span>`;
-  $("steps").append(li);
+function reset() {
+  S = { attempts: [], lanes: {}, sandbox: "", t0: Date.now() };
+  ORDER.forEach((k) => { const el = step(k); el.className = "step"; delete el.dataset.t; el.querySelector(".t").textContent = ""; detail(k).innerHTML = ""; });
+  $("log").innerHTML = ""; $("report").className = ""; $("report").innerHTML = "";
+  $("runtitle").textContent = "Test-running…";
+  clearInterval(timer);
+  timer = setInterval(() => ($("clock").textContent = ((Date.now() - S.t0) / 1000).toFixed(1) + "s"), 100);
+}
+
+function rawlog(t, msg) {
+  $("log").insertAdjacentHTML("beforeend", `<div><span class="lt">${t == null ? "" : t.toFixed(1) + "s"}</span><span>${esc(msg)}</span></div>`);
+  $("log").scrollTop = $("log").scrollHeight;
+}
+
+function highlight(code) {
+  return esc(code)
+    .replace(/(#[^\n]*)/g, '<span class="cm">$1</span>')
+    .replace(/(&quot;[^\n]*?&quot;|'[^'\n]*')/g, '<span class="str">$1</span>')
+    .replace(/\b(import|from|def|return|for|in|if|elif|else|not|and|or|with|as|try|except|continue|break|None|True|False|while|class|lambda)\b/g, '<span class="kw">$1</span>')
+    .replace(/\b([a-zA-Z_]\w*)(?=\()/g, '<span class="fn">$1</span>');
+}
+
+function renderAttempts() {
+  detail("ai").innerHTML = S.attempts.map((a, i) => `
+    <div class="attempt">
+      <span>Attempt ${i + 1}</span>
+      <span class="s ${a.ok === true ? "ok" : a.ok === false ? "bad" : "wait"}">${a.ok === true ? "Passed its test" : a.ok === false ? "Failed its test" : "Testing in the sandbox…"}</span>
+      ${a.ok === false ? `<span class="why">${esc(a.why)}</span>` : ""}
+      <span class="toggle" data-i="${i}">${a.open ? "Hide code" : "View code"}</span>
+    </div>
+    <pre class="code ${a.open ? "open" : ""}">${highlight(a.code)}</pre>`).join("") +
+    (S.attempts.length ? `<div class="d mono" style="color:var(--faint);margin-top:10px">written by ${esc(S.attempts.at(-1).model)}</div>` : "");
+  detail("ai").querySelectorAll(".toggle").forEach((el) => (el.onclick = () => { const a = S.attempts[+el.dataset.i]; a.open = !a.open; renderAttempts(); }));
+}
+
+function renderLanes() {
+  detail("forks").innerHTML = Object.entries(S.lanes).map(([name, l]) => `
+    <div class="lane"><span class="nm">npm ${esc(name)}</span><span class="id">${esc(l.id)}</span>${l.tag}</div>`).join("");
+}
+
+function netRules(blocked = []) {
+  detail("lock").innerHTML = `<div class="kv">
+    <span class="k g">ALLOW</span><span class="v">registry.npmjs.org:443</span><span class="w"></span>
+    <span class="k x">DENY</span><span class="v" style="color:var(--faint)">everything else</span><span class="w"></span>
+    ${blocked.map((c) => `<span class="k r">BLOCKED</span><span class="v r">${esc(c.ip)}:${c.port}</span><span class="w">${esc(c.command)}</span>`).join("")}
+  </div>`;
 }
 
 function handle(e, es) {
-  if (e.type === "step") addStep(e.t, e.msg, e.ok);
-  else if (e.type === "code") $("code").insertAdjacentHTML("beforeend", `<details><summary>AI-written analyzer — attempt ${e.attempt} (${esc(e.model)})</summary><pre>${esc(e.code)}</pre></details>`);
-  else if (e.type === "output") $("code").insertAdjacentHTML("beforeend", `<details><summary>Output of npm ${esc(e.lane)}</summary><pre>${esc(e.text)}</pre></details>`);
-  else if (e.type === "error") addStep("", "Error: " + e.msg, false);
-  else if (e.type === "report") showReport(e.report);
-  else if (e.type === "done") { es.close(); $("go").disabled = false; }
+  if (e.type === "step") {
+    const m = e.msg;
+    rawlog(e.t, m);
+    if (/Sandboxes cleaned up/.test(m)) return;
+    const hit = MATCH.find(([, re]) => re.test(m));
+    if (hit) advance(hit[0], e.t);
+    if (e.sandbox && !S.sandbox) { S.sandbox = e.sandbox; detail("sandbox").innerHTML = `<span class="mono">${esc(e.sandbox)}</span> · CreateOS devbox, 1 vCPU`; }
+    const proj = m.match(/^Project "([^"]+)"/);
+    if (proj) $("runtitle").textContent = proj[1];
+    if (/Network locked/.test(m)) netRules();
+    if (/Asking the AI/.test(m) && !S.attempts.length) detail("ai").innerHTML = '<span style="color:var(--muted)">The agent is writing a trace analyzer…</span>';
+    if (/passed its calibration/.test(m)) { const a = S.attempts.at(-1); if (a) a.ok = true; renderAttempts(); }
+    if (/Analyzer failed/.test(m)) { const a = S.attempts.at(-1); if (a) { a.ok = false; a.why = m.replace(/^Analyzer failed its test: /, "").replace(/ — sending.*$/, ""); } renderAttempts(); }
+    if (/built-in analyzer/.test(m)) detail("ai").insertAdjacentHTML("beforeend", '<div class="attempt"><span class="s wait">Using the built-in analyzer instead</span></div>');
+    if (/Running npm install/.test(m)) detail("install").textContent = "Running npm install under strace…";
+    const done = m.match(/Install finished \(exit (\d+)\) — (\d+) unexpected file access\(es\), (\d+) blocked/);
+    if (done) {
+      const [, code, f, c] = done;
+      detail("install").innerHTML = (+f || +c)
+        ? `<span style="color:var(--red);font-weight:500">${f} unexpected file ${f === "1" ? "read" : "reads"}, ${c} blocked ${c === "1" ? "connection" : "connections"}</span> · exit ${code}`
+        : `Nothing unexpected · exit ${code}`;
+    }
+    if (/Snapshotting/.test(m)) detail("forks").innerHTML = '<span style="color:var(--muted)">Snapshotting the installed sandbox…</span>';
+    const run = m.match(/^(?:Fork|Sandbox) (\S+): running npm (\w+)/);
+    if (run) { S.lanes[run[2]] = { id: run[1], tag: '<span class="tag run">running</span>' }; renderLanes(); }
+  } else if (e.type === "code") {
+    S.attempts.push({ code: e.code, model: e.model, ok: null, open: false });
+    renderAttempts();
+  } else if (e.type === "output") {
+    rawlog(null, `$ npm ${e.lane}`);
+    e.text.trim().split("\n").filter((x) => !/npm notice/.test(x)).slice(-5).forEach((l) => rawlog(null, "  " + l));
+  } else if (e.type === "error") {
+    rawlog(null, "Error: " + e.msg);
+    $("runtitle").textContent = "Something went wrong";
+    clearInterval(timer);
+  } else if (e.type === "report") {
+    showReport(e.report);
+  } else if (e.type === "done") {
+    es.close(); $("go").disabled = false; clearInterval(timer);
+  }
 }
 
 function showReport(r) {
-  const label = { green: "🟢 Looks clean", yellow: "🟡 Worth a look", red: "🔴 Behaves unexpectedly" }[r.verdict];
-  const files = r.files.map((f) => `<tr><td><code>${esc(f.path)}</code>${f.marker ? ' <span class="pill">Tripwire test file</span>' : ""}</td><td><code>${esc(f.command)}</code></td><td>npm ${esc(f.lane)}</td></tr>`).join("");
-  const conns = r.connections.map((c) => `<tr><td><code>${esc(c.ip)}:${c.port}</code> <span class="pill">blocked</span></td><td><code>${esc(c.command)}</code></td><td>npm ${esc(c.lane)}</td></tr>`).join("");
-  $("rep").innerHTML = `
-    <h2>Report · ${esc(r.project)}</h2>
-    <p class="verdict ${r.verdict}">${label}</p>
-    <p>${esc(r.summary)}</p>
-    ${files ? `<h2 style="margin-top:20px">Files opened outside the project</h2><table><tr><th>File</th><th>Opened by</th><th>During</th></tr>${files}</table>` : ""}
-    ${conns ? `<h2 style="margin-top:20px">Outside connections attempted</h2><table><tr><th>Address</th><th>Attempted by</th><th>During</th></tr>${conns}</table>` : ""}
-    ${!files && !conns ? `<p class="ok">No unexpected file access. No outside connections.</p>` : ""}
-    <p class="meta">Ran ${r.lanes.map((l) => `npm ${esc(l.lane)} (exit ${l.exitCode})`).join(", ")} in ${r.seconds}s ·
-      analyzer written by ${r.analyzer.author === "ai" ? `the AI, passed on attempt ${r.analyzer.attempts}` : "Tripwire (built-in fallback)"}
-      ${r.keptForEvidence.length ? ` · evidence snapshot: ${r.keptForEvidence.map(esc).join(", ")}` : ""}</p>`;
-  $("rep").classList.remove("hidden");
+  clearInterval(timer);
+  $("clock").textContent = r.seconds + "s";
+  for (const l of r.lanes.filter((x) => x.lane !== "install")) {
+    const flagged = r.files.some((f) => f.lane === l.lane) || r.connections.some((c) => c.lane === l.lane);
+    S.lanes[l.lane] = { id: l.sandbox, tag: flagged ? '<span class="tag flag">flagged</span>' : l.exitCode ? `<span class="tag exit">exit ${l.exitCode}</span>` : '<span class="tag ok">clean</span>' };
+  }
+  renderLanes();
+  netRules(r.connections);
+  ORDER.slice(0, 5).forEach((k) => { step(k).classList.remove("active"); step(k).classList.add("done"); });
+  if (r.connections.length || r.files.length) step("install").classList.replace("done", "warn");
+  step("verdict").classList.remove("active"); step("verdict").classList.add(r.verdict === "green" ? "done" : "warn");
+  step("verdict").querySelector(".t").textContent = r.seconds + "s";
+
+  const title = { green: "Looks clean.", yellow: "Worth a closer look.", red: "Behaves unexpectedly." }[r.verdict];
+  detail("verdict").textContent = { green: "Nothing unexpected", yellow: "Worth a look", red: "Unexpected behaviour found" }[r.verdict];
+  const items = [
+    ...r.files.map((f) => `<li><div class="what">${esc(f.path)}${f.marker ? '<small class="p">planted test file</small>' : ""}</div><div class="how2">Opened by <code>${esc(f.command)}</code> during npm ${esc(f.lane)}</div></li>`),
+    ...r.connections.map((c) => `<li><div class="what">${esc(c.ip)}:${c.port}<small>blocked</small></div><div class="how2">Connection attempted by <code>${esc(c.command)}</code> during npm ${esc(c.lane)}</div></li>`),
+  ].join("");
+  $("report").innerHTML = `
+    <div class="eyebrow">Verdict · ${esc(r.project)}</div>
+    <div class="verdict ${r.verdict}">${title}</div>
+    <p class="summary">${esc(r.summary).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "$1")}</p>
+    <div class="figures">
+      <div class="fig"><div class="n">${r.files.length}</div><div class="l">Unexpected file reads</div></div>
+      <div class="fig"><div class="n">${r.connections.length}</div><div class="l">Blocked connections</div></div>
+      <div class="fig"><div class="n">${r.lanes.length}</div><div class="l">Sandboxes used</div></div>
+      <div class="fig"><div class="n">${r.seconds}s</div><div class="l">From link to verdict</div></div>
+    </div>
+    <h5>Evidence</h5>
+    ${items ? `<ul class="ev">${items}</ul>` : '<p style="color:var(--muted)">No unexpected file access, and no outside connections.</p>'}
+    <div class="again"><a onclick="window.scrollTo({top:0,behavior:'smooth'});document.getElementById('src').select()">Test another repo</a></div>`;
+  $("report").className = "on";
+  setTimeout(() => $("report").scrollIntoView({ behavior: "smooth", block: "start" }), 200);
 }
+
+$("howlink").onclick = () => { document.body.classList.remove("running"); };
+$("demo").onclick = () => { $("src").value = "demo"; $("f").requestSubmit(); };
+$("f").onsubmit = async (ev) => {
+  ev.preventDefault();
+  $("go").disabled = true;
+  reset();
+  document.body.classList.add("running");
+  advance("sandbox", 0);
+  let source = $("src").value.trim();
+  if (/^github\.com\//.test(source)) source = "https://" + source;
+  const r = await fetch("/api/scan", { method: "POST", body: JSON.stringify({ source }) });
+  const j = await r.json();
+  if (!r.ok) { $("runtitle").textContent = j.error; clearInterval(timer); $("go").disabled = false; return; }
+  const es = new EventSource(`/api/scan/${j.id}/events`);
+  es.onmessage = (m) => handle(JSON.parse(m.data), es);
+};
 </script>
 </body>
 </html>
