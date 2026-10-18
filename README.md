@@ -9,6 +9,8 @@
   Tripwire installs a repo in an isolated, network-locked sandbox and tells you exactly what it touched.
 </p>
 
+<p align="center"><a href="https://youtu.be/6__olBhH7Co"><b>Watch the demo</b></a></p>
+
 ---
 
 ## Why
